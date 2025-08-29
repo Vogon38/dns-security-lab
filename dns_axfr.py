@@ -6,52 +6,55 @@
 # Used Modules:
 import dns.zone as dz
 import dns.query as dq
-import dns.resolver as dr
 import argparse
-
-# Initialize Resolver-Class from dns.resolver as "NS"
-NS = dr.Resolver()
 
 # List of found subdomains
 Subdomains = []
 
 # Define the AXFR Function
 def AXFR(domain, nameserver):
-    # Try zone transfer for given domain and nameserver
     try:
         # Perform the zone transfer
         axfr = dz.from_xfr(dq.xfr(nameserver, domain))
-        # If zone transfer was successful
         if axfr:
             print('[*] Successful Zone Transfer from {}'.format(nameserver))
-            # Add found subdomains to global 'Subdomains' list
             for record in axfr:
                 Subdomains.append('{}.{}'.format(record.to_text(), domain))
     except Exception as error:
-        print(error)
-        pass
+        print(f"Error with {nameserver}: {error}")
 
-# Main
-if __name__=="__main__":
-    parser = argparse.ArgumentParser(description='Zone transfer script.')
-    parser.add_argument('-target', '--domain', type=str, required=True, help='Target domain for zone transfer')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(prog="dns-axfr.py", epilog="DNS Zonetransfer Script",
+                                     usage="dns-axfr.py [options] -d <DOMAIN>", prefix_chars='-')
+    parser.add_argument('-d', metavar='Domain', type=str, help='Target Domain', required=True)
+    parser.add_argument('-n', metavar='Nameserver', type=str, help='Nameservers separated by comma')
+    parser.add_argument('-v', action='version', version='DNS-AXFR - v1.0')
 
     args = parser.parse_args()
-    Domain = args.domain
 
-    # Set the nameservers that will be used
-    NS.nameservers = ['ns1.inlanefreight.com', 'ns2.inlanefreight.com']
+    if not args.d:
+        print('[!] You must specify target Domain.')
+        parser.print_help()
+        exit()
 
-    # For each nameserver
-    for nameserver in NS.nameservers:
-        # Try AXFR
-        AXFR(Domain, nameserver)
+    if not args.n:
+        print('[!] You must specify target nameservers.')
+        parser.print_help()
+        exit()
 
-    # Print the results
+    Domain = args.d
+    # Separar os nomes dos servidores em uma lista
+    nameservers = [ns.strip() for ns in args.n.split(',')]
+
+    # Para cada nameserver, tentar o AXFR passando o nome ou IP
+    for ns in nameservers:
+        print(f"Attempting zone transfer from {ns}...")
+        AXFR(Domain, ns)
+
+    # Mostrar resultados
     if Subdomains:
         print('-------- Found Subdomains:')
-        for subdomain in Subdomains:
-            print('{}'.format(subdomain))
+        for sub in set(Subdomains):  # usar set para remover duplicados
+            print(sub)
     else:
         print('No subdomains found.')
-        exit()
